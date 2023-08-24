@@ -53,12 +53,17 @@ class Hardware {
   };
 #endif
 
-  const int pulse_min = 500;
-  const int pulse_max = 2400;
+  const int pulse_min = 550;
+  const int pulse_max = 2550;
 
   // ## pulse_max offset to adjust servo angle
   // ## tune value if legs are not balance equally.
-  int s_offset_max[4][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+  int s_offset_max[4][3] = {
+      {-30, 365, 200},  // RB
+      {-80, -90, 0},   // RF
+      {120, 90, 0},    // LF
+      {20, -100, -200}  // LB
+    };
 
   // offset values for green sample
   // int s_offset_max[4][3] = {
