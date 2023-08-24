@@ -219,7 +219,7 @@ void setup() {
 #endif  
   //
   hardware.init_hardware();
-  //: servo calibration mode - while PIN 25 connects to 3.3V, all servos in 90°
+  //: servo calibration mode - while PIN 13 connects to 3.3V, all servos in 90°
   //: for servo arm adjustment °
   pinMode(SERVO_CAL_GPIO_PIN, INPUT_PULLDOWN);
   while (digitalRead(SERVO_CAL_GPIO_PIN)) {
@@ -263,7 +263,7 @@ void loop() {
   // hardware.handle_hardware();
   kinematics.handle_kinematics(state, _direction, turn, height, _period);
   //
-  //: test mode -  while PIN 25 connects to 3.3V again, will walk in trot gait
+  //: test mode -  while PIN 13 connects to 3.3V again, will walk in trot gait
   static bool testMode = false;
   static long checkDuration = 0;
   if ((duration - checkDuration) > 1000) {
@@ -271,8 +271,10 @@ void loop() {
     if (digitalRead(SERVO_CAL_GPIO_PIN)) {
       CommandConsole.println("{msg:auto walking mode}");
       hardware.attachServos();
-      joystickLY = 127;
-      joystickRX = 127;
+      // joystickLY = 127;
+      joystickLY = 65;
+      // joystickRX = 127;
+      joystickRX = 0;
       state = 1;
       testMode = true;
       goto __handle_input;
@@ -291,7 +293,7 @@ void loop() {
   static unsigned long timeout = 0;
   if (millis() > timeout && !digitalRead(SERVO_POWER_OFF_GPIO_PIN)) {
     // CommandConsole.println("{msg:servo power saving mode}");
-    if ((duration - previousDuration) > 60000) {
+    if ((duration - previousDuration) > 600000) {   // 10 min
       previousDuration = duration;
       hardware.detachServos();  // turn off servos while not moving for 1 min
       joystickLX = 0;
