@@ -58,12 +58,18 @@ class Hardware {
 
   // ## pulse_max offset to adjust servo angle
   // ## tune value if legs are not balance equally.
+  // int s_offset_max[4][3] = {
+  //     {-30, 365, 200},  // RB
+  //     {-80, -90, 0},   // RF
+  //     {120, 90, 0},    // LF
+  //     {20, -100, -200}  // LB
+  //   };
   int s_offset_max[4][3] = {
-      {-30, 365, 200},  // RB
-      {-80, -90, 0},   // RF
-      {120, 90, 0},    // LF
-      {20, -100, -200}  // LB
-    };
+    {50, 500, 200},  // RB
+    {-80, 150, -100},   // RF
+    {-50, -50, -300},    // LF
+    {-300, -300, -700}  // LB
+  };
 
   // offset values for green sample
   // int s_offset_max[4][3] = {

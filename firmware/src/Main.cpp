@@ -20,7 +20,17 @@
 #include "Config.hpp"
 #include "Hardware.hpp"
 #include "Kinematics.hpp"
+
 #include "SerialCommand.hpp"
+#include <BluetoothHardware.h>  // for ros bluetooth connection
+
+#include "WiFiConfig.h"         // for ros wifi connection password
+#include <Wifi.h>
+
+#include <ros.h>
+#include <ros/node_handle.h>
+#include <std_msgs/String.h>
+#include <geometry_msgs/Twist.h>
 /*
   ==============================
   HARDWARE - control method
@@ -51,7 +61,8 @@ float turn = 0;    //> indicates the direction of rotation
 float height = 0;  //> indicates the leg extension
 
 int state = 0;         //> indicates the type of gait, (0) idle, (1) trot, (2) yaw, (3) pitch-roll
-float _period = 10.0;  //> indicates the number of steps every second
+// float _period = 7.0;  //> indicates the number of steps every second
+float _period = 16.0;  //> indicates the number of steps every second
 
 datatypes::Rotator
     _sRotation;  //> this variable stores the relative rotation of the body
@@ -64,8 +75,58 @@ int8_t joystickRY = 0;
 unsigned long duration;
 
 //: handle input paramters
-float stick_min = 6.f;
+float stick_min = 5.f;
 float lx, ly, rx, ry;
+
+#ifdef __ROS__
+  //: ROS variables, and Publishers
+  #ifdef __USE_WIFI__
+    uint16_t serverPort = 11411;
+    const char*  ssid = SSIDNAME;
+    const char*  password = WIFIPASSWORD;
+    ros::NodeHandle nh;
+  #endif //__USE_WIFI__
+  #ifdef __USE_BT__
+    ros::NodeHandle_<BluetoothHardware> nh;
+  #endif //__USE_BT__
+  
+  std_msgs::String str_msg;
+  ros::Publisher chatter("ESPchatter", &str_msg);
+
+  uint16_t period = 10000;
+  uint32_t last_time = 0;
+
+  char hello[25] = "hello world from esp32!!";
+
+  //: ROS callback functions, and Subscribers
+  // float demandx = 0;
+  // float demandy = 0;
+  // float demandz = 0;
+  volatile bool demandUpdate = false;
+  void cmdVelCallback(const geometry_msgs::Twist &cmd_vel) {
+    int joyMax = 127;
+    // int joyMax = 80;
+    float x = constrain(cmd_vel.linear.x, -1, 1) * joyMax;
+    float y = constrain(cmd_vel.linear.y, -1, 1) * joyMax;
+    float z = constrain(cmd_vel.angular.z, -1, 1) * joyMax;
+    if (joystickLX != x) {
+      demandUpdate = true;
+      joystickLY = x;
+    }
+    if (joystickLY != y) {
+      demandUpdate = true;
+      joystickLX = y;
+    }
+    if (joystickRX != z) {
+      demandUpdate = true;
+      joystickRX = -z;
+    }
+    // Serial.print("joystick cmd_vel callback ");
+    Serial.println((String)"x: " + x + " y: " + y + " z: " + z);
+  }
+  ros::Subscriber<geometry_msgs::Twist> cmdVelSubscriber("cmd_vel", cmdVelCallback);
+#endif  //__ROS__
+
 
 void aborted() {
   Console.println("{msg:program aborted!}");
@@ -92,7 +153,7 @@ void handle_input() {
     float x0 =
         lx - stick_min * Kinematics::sign(lx);  //> subtracts the deadzone
     if (state == 1) {
-      _direction.y = 0;  // x0 / 10.f;
+      _direction.y = x0 / 10.f;
     } else if (state != 4) {
       _direction.y = x0 / 2;
     }
@@ -205,6 +266,13 @@ void unrecognized(const char *command) {
   CommandConsole.printf("Invalid command! [%s]", command);
 }
 
+void setupWiFi()  // if wifi
+{  
+   WiFi.begin(ssid, password);
+   while (WiFi.status() != WL_CONNECTED) { delay(500);Serial.print("."); }
+   Serial.println((String)"SSID: " + WiFi.SSID() + " IP: " + WiFi.localIP());
+}
+
 void setup() {
   Console.begin(115200);
   CommandConsole.begin(38400);
@@ -212,12 +280,30 @@ void setup() {
   Console.println("{msg:in debugging mode}");
 #endif
 
+#ifdef __ROS__
+  #ifdef __USE_WIFI__
+    setupWiFi();  // if wifi
+    nh.getHardware()->setConnection(server, serverPort);
+    nh.initNode();
+    // Another way to get IP
+    Serial.println((String)"ROS IP = " + nh.getHardware()->getLocalIP());
+  #endif //__USE_WIFI__
+  #ifdef __USE_BT__
+    nh.initNode();
+  #endif //__USE_BT__
+
+  nh.subscribe(cmdVelSubscriber);
+  nh.advertise(chatter);
+  
+  Serial.println("rosserial with wifi/bluetooth");
+#endif  //__ROS__
   //
 #ifdef __GOBLE__  
   serialBle.begin();
   Goble.begin();
-#endif  
+#endif //__GOBLE__
   //
+
   hardware.init_hardware();
   //: servo calibration mode - while PIN 13 connects to 3.3V, all servos in 90°
   //: for servo arm adjustment °
@@ -266,7 +352,7 @@ void loop() {
   //: test mode -  while PIN 13 connects to 3.3V again, will walk in trot gait
   static bool testMode = false;
   static long checkDuration = 0;
-  if ((duration - checkDuration) > 1000) {
+  if ((duration - checkDuration) > 1000) {  // check every 1 sec
     checkDuration = duration;
     if (digitalRead(SERVO_CAL_GPIO_PIN)) {
       CommandConsole.println("{msg:auto walking mode}");
@@ -275,6 +361,7 @@ void loop() {
       joystickLY = 65;
       // joystickRX = 127;
       joystickRX = 0;
+      Serial.println((String)"Auto Walk > joystickLY: " + joystickLY + " joystickRX: " + joystickRX);
       state = 1;
       testMode = true;
       goto __handle_input;
@@ -284,9 +371,35 @@ void loop() {
       joystickRX = 0;
       joystickRY = 0;
       testMode = false;
-      goto __handle_input;
+      // goto __handle_input;
     }
   }
+
+#ifdef __ROS__
+  state = 1;
+  if(millis() - last_time >= period)  // check if ros is connected every <period> sec
+  {
+    last_time = millis();
+    if (nh.connected())
+    {
+      Serial.println("Connected");
+      // Say hello
+      str_msg.data = hello;
+      chatter.publish( &str_msg );
+    } else {
+      Serial.println("Not Connected");
+    }
+  }
+  // nh.spinOnce();
+  // delay(1);
+
+  nh.spinOnce();
+  Serial.println((String)"LOOP > joystickLX: "+joystickLX+" joystickLY: "+joystickLY+" joystickRX: "+joystickRX);
+
+  // delay(100);
+  goto __handle_input;
+#endif  //__ROS__
+
 
 #ifdef __GOBLE__
   static long previousDuration = 0;

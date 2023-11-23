@@ -8,7 +8,11 @@
 #define CommandConsole Serial2
 
 // select the way of control
-#define __GOBLE__
+// #define __SERIAL__
+// #define __GOBLE__
+#define __ROS__
+#define __USE_WIFI__
+// #define __USE_BT__
 
 //
 #define BUZZER_GPIO_PIN 23
