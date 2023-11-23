@@ -8,9 +8,8 @@
     <node pkg="rosserial_python"
         name="rosserial_node"
         type="serial_node.py" output="screen">
-        <!-- <rosparam>port: /dev/rfcomm1</rosparam> -->
-        <!-- 40:91:51:FC:67:7E -->
-        <rosparam>port: tcp</rosparam>
+        <rosparam>port: /dev/rfcomm1</rosparam>
+        <!-- <rosparam>port: tcp</rosparam> -->
         <rosparam>baud: 115200</rosparam>
     </node>
     <node pkg="bluetooth_comm"
