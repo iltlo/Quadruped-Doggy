@@ -1,8 +1,9 @@
 firmware/.pio
-firmware/.vscode/.browse.c_cpp.db*
-firmware/.vscode/c_cpp_properties.json
-firmware/.vscode/launch.json
-firmware/.vscode/ipch
+firmware/.vscode/
+firmware/lib/ros_lib/
+firmware/include/WiFiConfig.h
 ros-ws/.catkin_workspace
 ros-ws/build/
 ros-ws/devel/
+ros-ws/.vscode/
+.vscode/

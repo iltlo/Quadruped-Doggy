@@ -1,46 +1,41 @@
-#ifndef DATATYPES_H
-#define DATATYPES_H
+#ifndef __DATA_TYPES__
+#define __DATA_TYPES__
 
-#define mm 0.1 /// millimeter
-
-inline int sign(float num) {
-  return int(num >= 0) - int(num < 0);
-}
+#define mm 0.1  /// millimeter
 
 class datatypes {
-  public:
-    /* ::: STEP, DATA TYPE ::: */
-    struct Step {
-      float base;
-      float angle;
-    };
+ public:
+  /* ::: STEP, DATA TYPE ::: */
+  struct Step {
+    float base;
+    float angle;
+  };
 
-    /* ::: VECTOR, DATA TYPE ::: */
-    struct Vector {
-      float x;
-      float y;
-      float z;
-    };
+  /* ::: VECTOR, DATA TYPE ::: */
+  struct Vector {
+    double x;
+    double y;
+    double z;
+  };
 
-    /* ::: 2D VECTOR, DATA TYPE ::: */
-    struct Vector2D {
-      float x;
-      float y;
-    };
+  /* ::: 2D VECTOR, DATA TYPE ::: */
+  struct Vector2D {
+    float x;
+    float y;
+  };
 
-    /* ::: ROTATOR, DATA TYPE ::: */
-    struct Rotator {
-      float yaw;
-      float pitch;
-      float roll;
-    };
+  /* ::: ROTATOR, DATA TYPE ::: */
+  struct Rotator {
+    float yaw;
+    float pitch;
+    float roll;
+  };
 
-    /* ::: TRANFORM, DATA TYPE ::: */
-    struct Transform {
-      Vector pos;
-      Rotator rot;
-      Vector scl;
-    };
+  /* ::: TRANFORM, DATA TYPE ::: */
+  struct Transform {
+    Vector pos;
+    Rotator rot;
+    Vector scl;
+  };
 };
-
-#endif // DATATYPES_H
+#endif
