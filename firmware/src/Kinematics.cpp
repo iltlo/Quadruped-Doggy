@@ -6,9 +6,12 @@ void Kinematics::handle_kinematics(int state, datatypes::Vector2D _dir, float _t
 {
   for (int l = 0; l < 4; l++)
   {
+    // Recall: base_offset{0, -1, 0, -2}
     float base = c_base(90) + base_offset[l] + _height; //> stores the base of each leg
+    // base is the distance from the center of the body to the joint of each leg
 
     datatypes::Vector2D dir = {
+      // Recall: l_inv{ {+,-}, {-,-}, {-,+}, {+,+} }
       precision + _dir.x + (_turn)*l_inv[l][1],
       precision + _dir.y + (_turn)*l_inv[l][0]
     };
@@ -21,15 +24,20 @@ void Kinematics::handle_kinematics(int state, datatypes::Vector2D _dir, float _t
     if (state == 1 && (abs(dir.x) > precision || abs(dir.y) > precision))
       vector = trot_gait_func({rDir.x * c[l], l_inv[l][1] * rDir.y * c[l]},
                               dir, boolean(l % 2) ^ boolean(c_inv[l] % 2));
+                              // boolean(l % 2) ^ boolean(c_inv[l] % 2) is equivalent to l % 2 != c_inv[l] % 2
     else if (state == 2)
       vector = yaw_axis(l, _turn);
     else if (state == 3)
       vector = pitch_roll_axis(l, base, {0, _dir.x, _dir.y});
-    else if (state == 4)
-    {
+    else if (state == 4) {
       vector = yaw_axis(l, stored_0x);
       if (abs(stored_0x + _turn / 4.f) < 32.f)
         stored_0x = inter(stored_0x, stored_0x + _turn / 4.f, 0.5f);
+    } else if (state == 5) {
+      vector = crawl_gait_func({rDir.x * c[l], l_inv[l][1] * rDir.y * c[l]},
+                                {dir.x, l_inv[l][1] * dir.y}, 
+                                l == crawl_pattern[int(c_inv[l])%4], 
+                                int(c_inv[l] + crawl_succession[l])%4);
     }
 
     //: this datatype stores three values which correspond to the three joint angles of each leg,
@@ -39,6 +47,7 @@ void Kinematics::handle_kinematics(int state, datatypes::Vector2D _dir, float _t
   }
 }
 
+//: clock function
 void Kinematics::count_c(int inst, datatypes::Vector2D dir, float period)
 {
   float w0 = step_extent.x * mm / (2 / max(abs(dir.x), abs(dir.y)));
@@ -76,6 +85,18 @@ datatypes::Vector Kinematics::trot_gait_func(datatypes::Vector2D c0, datatypes::
 
   float h1 = sqrt(abs((1 - sq(c0.x / w0) - sq(c0.y / l0)) * sq(h0)));
   return {c0.x / mm, c0.y / mm, h1 / mm * int(inv)};
+}
+
+//: crawl function
+datatypes::Vector Kinematics::crawl_gait_func(datatypes::Vector2D c0, datatypes::Vector2D dir, boolean inv, int i0) {
+  float w0 = step_extent.x * mm / 2 * dir.x;
+  float l0 = step_extent.y * mm * 4 * dir.y;
+  float h0 = step_extent.z * mm;
+
+  if (inv == false) c0 = {-(c0.x+(2*i0-2)*w0)/3, -(c0.y+(2*i0-2)*(l0/8))/3};
+
+  float h1 = sqrt(abs((1- sq(c0.x/w0) - sq(c0.y/l0)) * sq(h0)));
+  return {c0.x/mm, c0.y/mm, h1/mm * int(inv)};
 }
 
 /*

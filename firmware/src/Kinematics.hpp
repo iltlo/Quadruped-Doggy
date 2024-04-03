@@ -7,18 +7,19 @@ class Kinematics {
 
   public:
     Kinematics(Hardware& h):
-      base_offset{0, -1, 0, -2},l_inv{
-      { +1.f, -1.f}, // ## {dir, dir}
-      { -1.f, -1.f}, // ## {dir, dir}
-      { -1.f, +1.f}, // ## {dir, dir}
-      { +1.f, +1.f}  // ## {dir, dir}
-    }, hardware(h) {
-
-    } //Kinematics
+      base_offset{0, -1, 0, -2},
+      l_inv{
+        { +1.f, -1.f}, // ## {dir, dir} (y, x)
+        { -1.f, -1.f}, // ## {dir, dir}
+        { -1.f, +1.f}, // ## {dir, dir}
+        { +1.f, +1.f}  // ## {dir, dir}
+      }, 
+      hardware(h) { } //Kinematics
     //
     void handle_kinematics(int state, datatypes::Vector2D _dir, float _turn, float _height, float period);
     void count_c(int inst, datatypes::Vector2D dir, float period);
     datatypes::Vector trot_gait_func(datatypes::Vector2D c0, datatypes::Vector2D dir, bool inv);
+    datatypes::Vector crawl_gait_func(datatypes::Vector2D c0, datatypes::Vector2D dir, boolean inv, int i0);
     float c_base(float angle1);
     datatypes::Vector pitch_roll_axis(int leg, float base, datatypes::Rotator sRot);
     datatypes::Vector yaw_axis(int leg, float yaw);
@@ -31,6 +32,10 @@ class Kinematics {
     /// Kinematics Parameters
     float vrt_offset = -16.50;// ## mm
     float hrz_offset = -6.00;
+
+    int crawl_pattern[4] = {2, 0, 1, 3};
+    int crawl_succession[4] = {2, 1, 3, 0};
+
     //: this is an interpolation function used to smooth
     static float inter(float in, float en, float pl) {
       if (in < en - pl) {
@@ -79,7 +84,7 @@ class Kinematics {
     };
     //: high level parameters for the step function
     // const datatypes::Vector step_extent = {40, 40, 26}; // ## {mm, mm}
-    const datatypes::Vector step_extent = {35, 35, 24}; // ## {mm, mm}
+    const datatypes::Vector step_extent = {20, 20, 26}; // ## {mm, mm}
 };
 
 

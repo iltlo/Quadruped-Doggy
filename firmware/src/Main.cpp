@@ -43,12 +43,12 @@
 #include "GoBLE.hpp"
 SerialBLE serialBle;
 _GoBLE<SerialBLE, HardwareSerial> Goble(serialBle, Console);
-
 #endif  //__GOBLE__
 
-//
-SerialCommand<HardwareSerial, HardwareSerial> sCmd(CommandConsole, Console);
-//
+#ifdef __SERIAL__
+  SerialCommand<HardwareSerial, HardwareSerial> sCmd(CommandConsole, Console);
+#endif  //__SERIAL__
+
 Hardware hardware;
 Kinematics kinematics(hardware);
 float vo = kinematics.vrt_offset, ho = kinematics.hrz_offset;
@@ -62,7 +62,8 @@ float height = 0;  //> indicates the leg extension
 
 int state = 0;         //> indicates the type of gait, (0) idle, (1) trot, (2) yaw, (3) pitch-roll
 // float _period = 7.0;  //> indicates the number of steps every second
-float _period = 16.0;  //> indicates the number of steps every second
+// float _period = 6.0;  //> indicates the number of steps every second
+float _period = 4.0;  //> indicates the number of steps every second
 
 datatypes::Rotator
     _sRotation;  //> this variable stores the relative rotation of the body
@@ -78,12 +79,16 @@ unsigned long duration;
 float stick_min = 5.f;
 float lx, ly, rx, ry;
 
+// IPAddress server(192,168,99,211); // if wifi
+// const char*  ssid = "Robot-Operating-System-WiFi";
+// const char*  password = "ros-workshop";
+const char*  ssid = SSIDNAME;
+const char*  password = WIFIPASSWORD;
+
 #ifdef __ROS__
   //: ROS variables, and Publishers
   #ifdef __USE_WIFI__
     uint16_t serverPort = 11411;
-    const char*  ssid = SSIDNAME;
-    const char*  password = WIFIPASSWORD;
     ros::NodeHandle nh;
   #endif //__USE_WIFI__
   #ifdef __USE_BT__
@@ -136,22 +141,12 @@ void aborted() {
 }
 
 void handle_input() {
-  lx = Kinematics::inter(
-      lx, joystickLX / 4.f,
-      0.5f);  //> gets the interpolated x-position of the left  analog stick
-  ly = Kinematics::inter(
-      ly, joystickLY / 4.f,
-      0.5f);  //> gets the interpolated y-position of the left  analog stick
-  rx = Kinematics::inter(
-      rx, joystickRX / 4.f,
-      0.5f);  //> gets the interpolated x-position of the right analog stick
-  ry = Kinematics::inter(
-      ry, joystickRY / 4.f,
-      0.5f);  //> gets the interpolated y-position of the right analog stick
-  if (abs(lx) >
-      stick_min) {  //> checks whether the stick position is out of the deadzone
-    float x0 =
-        lx - stick_min * Kinematics::sign(lx);  //> subtracts the deadzone
+  lx = Kinematics::inter(lx, joystickLX / 4.f, 0.5f);  //> gets the interpolated x-position of the left  analog stick
+  ly = Kinematics::inter(ly, joystickLY / 4.f, 0.5f);  //> gets the interpolated y-position of the left  analog stick
+  rx = Kinematics::inter(rx, joystickRX / 4.f, 0.5f);  //> gets the interpolated x-position of the right analog stick
+  ry = Kinematics::inter(ry, joystickRY / 4.f, 0.5f);  //> gets the interpolated y-position of the right analog stick
+  if (abs(lx) > stick_min) {  //> checks whether the stick position is out of the deadzone
+    float x0 = lx - stick_min * Kinematics::sign(lx);  //> subtracts the deadzone
     if (state == 1) {
       _direction.y = x0 / 10.f;
     } else if (state != 4) {
@@ -160,10 +155,8 @@ void handle_input() {
   } else
     _direction.y = 0;
 
-  if (abs(ly) >
-      stick_min) {  //> checks whether the stick position is out of the deadzone
-    float y0 =
-        ly - stick_min * Kinematics::sign(ly);  //> subtracts the deadzone
+  if (abs(ly) > stick_min) {  //> checks whether the stick position is out of the deadzone
+    float y0 = ly - stick_min * Kinematics::sign(ly);  //> subtracts the deadzone
     if (state == 1) {
       _direction.x = y0 / 10.f;
       if (y0 > 0)
@@ -181,10 +174,8 @@ void handle_input() {
     kinematics.vrt_offset = vo;
   };
 
-  if (abs(rx) >
-      stick_min) {  //> checks whether the stick position is out of the deadzone
-    float x1 =
-        rx - stick_min * Kinematics::sign(rx);  //> subtracts the deadzone
+  if (abs(rx) > stick_min) {  //> checks whether the stick position is out of the deadzone
+    float x1 = rx - stick_min * Kinematics::sign(rx);  //> subtracts the deadzone
     if (state == 1)
       turn = x1 / 16.f;
     else if (state != 4)
@@ -192,10 +183,8 @@ void handle_input() {
   } else
     turn = 0;
 
-  if (abs(ry) >
-      stick_min) {  //> checks whether the stick position is out of the deadzone
-    float y1 =
-        ry - stick_min * Kinematics::sign(ry);  //> subtracts the deadzone
+  if (abs(ry) > stick_min) {  //> checks whether the stick position is out of the deadzone
+    float y1 = ry - stick_min * Kinematics::sign(ry);  //> subtracts the deadzone
     height = y1;
   } else
     height = 0;
@@ -218,53 +207,55 @@ void handle_input() {
   // #endif
 }
 
-int handle_arg_int(char *args) {
-  if (args == NULL) return -1;
-  auto j = atoi(args);
-  return j;
-}
-
-void handle_s_cmd(void) {
-  bool validCmd = true;
-
-  auto leg = handle_arg_int(sCmd.next());
-  auto joint = handle_arg_int(sCmd.next());
-  auto pw = handle_arg_int(sCmd.next());
-  // CommandConsole.printf("%d %d %d\n", leg, joint, pw);
-  if (leg < 0 || leg > 4 || joint < 0 || joint > 3 || pw == -1) {
-    validCmd = false;
-    goto __return;
+#ifdef __SERIAL__
+  int handle_arg_int(char *args) {
+    if (args == NULL) return -1;
+    auto j = atoi(args);
+    return j;
   }
-  hardware.set_max_pw_offset(leg, joint, pw);
-__return:
-  if (validCmd)
-    CommandConsole.println("ok");
-  else
-    CommandConsole.println("bad, usage: p leg joint pw");
-}
 
-void handle_p_cmd(void) {
-  int leg, pw;
+  void handle_s_cmd(void) {
+    bool validCmd = true;
 
-  for (auto leg = 1; leg <= 4; leg++) {
-    for (auto joint = 1; joint <= 3; joint++) {
-      pw = hardware.get_max_pw_offset(leg, joint);
-      CommandConsole.printf("s %d %d %d\n", leg, joint, pw);
+    auto leg = handle_arg_int(sCmd.next());
+    auto joint = handle_arg_int(sCmd.next());
+    auto pw = handle_arg_int(sCmd.next());
+    // CommandConsole.printf("%d %d %d\n", leg, joint, pw);
+    if (leg < 0 || leg > 4 || joint < 0 || joint > 3 || pw == -1) {
+      validCmd = false;
+      goto __return;
+    }
+    hardware.set_max_pw_offset(leg, joint, pw);
+  __return:
+    if (validCmd)
+      CommandConsole.println("ok");
+    else
+      CommandConsole.println("bad, usage: p leg joint pw");
+  }
+
+  void handle_p_cmd(void) {
+    int leg, pw;
+
+    for (auto leg = 1; leg <= 4; leg++) {
+      for (auto joint = 1; joint <= 3; joint++) {
+        pw = hardware.get_max_pw_offset(leg, joint);
+        CommandConsole.printf("s %d %d %d\n", leg, joint, pw);
+      }
     }
   }
-}
-void handle_w_cmd(void) {}
+  void handle_w_cmd(void) {}
 
-void handle_t_cmd(void) {
-  state = state ? 0 : 1;
-  joystickRX = 0;
-  joystickLY = 70;
-  CommandConsole.println("ok");
-}
+  void handle_t_cmd(void) {
+    state = state ? 0 : 1;
+    joystickRX = 0;
+    joystickLY = 70;
+    CommandConsole.println("ok");
+  }
 
-void unrecognized(const char *command) {
-  CommandConsole.printf("Invalid command! [%s]", command);
-}
+  void unrecognized(const char *command) {
+    CommandConsole.printf("Invalid command! [%s]", command);
+  }
+#endif  //__SERIAL__
 
 void setupWiFi()  // if wifi
 {  
@@ -276,32 +267,32 @@ void setupWiFi()  // if wifi
 void setup() {
   Console.begin(115200);
   CommandConsole.begin(38400);
-#ifdef __DEBUG__
-  Console.println("{msg:in debugging mode}");
-#endif
+  #ifdef __DEBUG__
+    Console.println("{msg:in debugging mode}");
+  #endif
 
-#ifdef __ROS__
-  #ifdef __USE_WIFI__
-    setupWiFi();  // if wifi
-    nh.getHardware()->setConnection(server, serverPort);
-    nh.initNode();
-    // Another way to get IP
-    Serial.println((String)"ROS IP = " + nh.getHardware()->getLocalIP());
-  #endif //__USE_WIFI__
-  #ifdef __USE_BT__
-    nh.initNode();
-  #endif //__USE_BT__
+  #ifdef __ROS__
+    #ifdef __USE_WIFI__
+      setupWiFi();  // if wifi
+      nh.getHardware()->setConnection(server, serverPort);
+      nh.initNode();
+      // Another way to get IP
+      Serial.println((String)"ROS IP = " + nh.getHardware()->getLocalIP());
+    #endif //__USE_WIFI__
+    #ifdef __USE_BT__
+      nh.initNode();
+    #endif //__USE_BT__
 
-  nh.subscribe(cmdVelSubscriber);
-  nh.advertise(chatter);
-  
-  Serial.println("rosserial with wifi/bluetooth");
-#endif  //__ROS__
-  //
-#ifdef __GOBLE__  
-  serialBle.begin();
-  Goble.begin();
-#endif //__GOBLE__
+    nh.subscribe(cmdVelSubscriber);
+    nh.advertise(chatter);
+    
+    Serial.println("rosserial with wifi/bluetooth");
+  #endif  //__ROS__
+    //
+  #ifdef __GOBLE__  
+    serialBle.begin();
+    Goble.begin();
+  #endif //__GOBLE__
   //
 
   hardware.init_hardware();
@@ -314,11 +305,14 @@ void setup() {
   }
   pinMode(SERVO_POWER_OFF_GPIO_PIN, INPUT_PULLUP);
   //
-  sCmd.addCommand("s", handle_s_cmd);
-  sCmd.addCommand("p", handle_p_cmd);
-  sCmd.addCommand("w", handle_w_cmd);
-  sCmd.addCommand("t", handle_t_cmd);
-  sCmd.setDefaultHandler(unrecognized);
+
+  #ifdef __SERIAL__
+    sCmd.addCommand("s", handle_s_cmd);
+    sCmd.addCommand("p", handle_p_cmd);
+    sCmd.addCommand("w", handle_w_cmd);
+    sCmd.addCommand("t", handle_t_cmd);
+    sCmd.setDefaultHandler(unrecognized);
+  #endif  //__SERIAL__
 
   buzzer.beepShort();
   Console.println("{msg:started}");
@@ -375,108 +369,111 @@ void loop() {
     }
   }
 
-#ifdef __ROS__
-  state = 1;
-  if(millis() - last_time >= period)  // check if ros is connected every <period> sec
-  {
-    last_time = millis();
-    if (nh.connected())
+  #ifdef __ROS__
+    state = 1;
+    if(millis() - last_time >= period)  // check if ros is connected every <period> sec
     {
-      Serial.println("Connected");
-      // Say hello
-      str_msg.data = hello;
-      chatter.publish( &str_msg );
-    } else {
-      Serial.println("Not Connected");
+      last_time = millis();
+      if (nh.connected())
+      {
+        Serial.println("Connected");
+        // Say hello
+        str_msg.data = hello;
+        chatter.publish( &str_msg );
+      } else {
+        Serial.println("Not Connected");
+      }
     }
-  }
-  // nh.spinOnce();
-  // delay(1);
+    // nh.spinOnce();
+    // delay(1);
 
-  nh.spinOnce();
-  Serial.println((String)"LOOP > joystickLX: "+joystickLX+" joystickLY: "+joystickLY+" joystickRX: "+joystickRX);
+    nh.spinOnce();
+    // Serial.println((String)"LOOP > joystickLX: "+joystickLX+" joystickLY: "+joystickLY+" joystickRX: "+joystickRX);
 
-  // delay(100);
-  goto __handle_input;
-#endif  //__ROS__
+    // delay(100);
+    goto __handle_input;
+  #endif  //__ROS__
 
 
-#ifdef __GOBLE__
-  static long previousDuration = 0;
-  static unsigned long timeout = 0;
-  if (millis() > timeout && !digitalRead(SERVO_POWER_OFF_GPIO_PIN)) {
-    // CommandConsole.println("{msg:servo power saving mode}");
-    if ((duration - previousDuration) > 600000) {   // 10 min
-      previousDuration = duration;
-      hardware.detachServos();  // turn off servos while not moving for 1 min
-      joystickLX = 0;
-      joystickLY = 0;
-      joystickRX = 0;
-      joystickRY = 0;
-      buzzer.beepShort();
-      CommandConsole.println("{msg:stopped servos for power saving}");
-      return;
-    }
-    timeout = millis() + 200;
-  }
-
-  if (Goble.available()) {
-    previousDuration = duration;
-    hardware.attachServos();  // turn on servos if they are off
-    switch (state) {
-      case 1:
-        joystickLY = map(Goble.readJoystickY(), 255, 0, 127, -128);
-        joystickRX = map(Goble.readJoystickX(), 255, 0, 127, -128);
-        break;
-      case 2:
-        joystickRY = map(Goble.readJoystickY(), 255, 0, 127, -128);
-        joystickRX = map(Goble.readJoystickX(), 255, 0, 127, -128);
-        break;
-      case 3:
-        joystickLY = map(Goble.readJoystickY(), 255, 0, 127, -128);
-        joystickLX = map(Goble.readJoystickX(), 0, 255, 127, -128);
-        break;
-      case 0:
-      default:
+  #ifdef __GOBLE__
+    static long previousDuration = 0;
+    static unsigned long timeout = 0;
+    if (millis() > timeout && !digitalRead(SERVO_POWER_OFF_GPIO_PIN)) {
+      // CommandConsole.println("{msg:servo power saving mode}");
+      if ((duration - previousDuration) > 600000) {   // 10 min
+        previousDuration = duration;
+        hardware.detachServos();  // turn off servos while not moving for 1 min
         joystickLX = 0;
         joystickLY = 0;
         joystickRX = 0;
         joystickRY = 0;
+        buzzer.beepShort();
+        CommandConsole.println("{msg:stopped servos for power saving}");
+        return;
+      }
+      timeout = millis() + 200;
     }
 
-    if (Goble.readSwitchUp() == PRESSED) {
-      state = 0;
-      buzzer.beepShort();
-    } else if (Goble.readSwitchDown() == PRESSED) {
-      state = 2;
-      buzzer.beepShort();
-    } else if (Goble.readSwitchLeft() == PRESSED) {
-      state = 3;
-      buzzer.beepShort();
-    } else if (Goble.readSwitchRight() == PRESSED) {
-      state = 1;
-      buzzer.beepShort();
-    }
-
-    if (Goble.readSwitchMid() == PRESSED) {
-      buzzer.beepShort();
-    } else if (Goble.readSwitchSelect() == PRESSED) {
-      buzzer.beepShort();
-    } else if (Goble.readSwitchAction() == PRESSED) {
-      buzzer.beepShort();
-    } else if (Goble.readSwitchStart() == PRESSED) {
-      buzzer.beepShort();
-      hardware.detachServos();
-      joystickLX = 0;
-      joystickLY = 0;
-      joystickRX = 0;
-      joystickRY = 0;
+    if (Goble.available()) {
       previousDuration = duration;
+      hardware.attachServos();  // turn on servos if they are off
+      switch (state) {
+        case 1:
+          joystickLY = map(Goble.readJoystickY(), 255, 0, 127, -128);
+          joystickRX = map(Goble.readJoystickX(), 255, 0, 127, -128);
+          break;
+        case 2:
+          joystickRY = map(Goble.readJoystickY(), 255, 0, 127, -128);
+          joystickRX = map(Goble.readJoystickX(), 255, 0, 127, -128);
+          break;
+        case 3:
+          joystickLY = map(Goble.readJoystickY(), 255, 0, 127, -128);
+          joystickLX = map(Goble.readJoystickX(), 0, 255, 127, -128);
+          break;
+        case 0:
+        default:
+          joystickLX = 0;
+          joystickLY = 0;
+          joystickRX = 0;
+          joystickRY = 0;
+      }
+
+      if (Goble.readSwitchUp() == PRESSED) {
+        state = 0;
+        buzzer.beepShort();
+      } else if (Goble.readSwitchDown() == PRESSED) {
+        state = 2;
+        buzzer.beepShort();
+      } else if (Goble.readSwitchLeft() == PRESSED) {
+        state = 3;
+        buzzer.beepShort();
+      } else if (Goble.readSwitchRight() == PRESSED) {
+        state = 1;
+        buzzer.beepShort();
+      }
+
+      if (Goble.readSwitchMid() == PRESSED) {
+        buzzer.beepShort();
+      } else if (Goble.readSwitchSelect() == PRESSED) {
+        buzzer.beepShort();
+      } else if (Goble.readSwitchAction() == PRESSED) {
+        buzzer.beepShort();
+      } else if (Goble.readSwitchStart() == PRESSED) {
+        buzzer.beepShort();
+        hardware.detachServos();
+        joystickLX = 0;
+        joystickLY = 0;
+        joystickRX = 0;
+        joystickRY = 0;
+        previousDuration = duration;
+      }
     }
-  }
-#endif  //__GOBLE__
+  #endif  //__GOBLE__
   //
-__handle_input:
+  __handle_input:
   handle_input();
-  sCmd.readSerial();
+
+  #ifdef __SERIAL__
+    sCmd.readSerial();
+  #endif  //__SERIAL__
 }

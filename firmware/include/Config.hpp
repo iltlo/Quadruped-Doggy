@@ -14,7 +14,6 @@
 #define __USE_WIFI__
 // #define __USE_BT__
 
-//
 #define BUZZER_GPIO_PIN 23
 #define SERVO_CAL_GPIO_PIN 13
 #define SERVO_POWER_OFF_GPIO_PIN 34
